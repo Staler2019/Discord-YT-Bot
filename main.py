@@ -623,7 +623,7 @@ async def on_ready():
 async def botstop(ctx):
     print('Goodbye')
     await ctx.send('Goodbye')
-    await bot.logout()
+    await bot.close()
     return
 
 bot.run(token)

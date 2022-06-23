@@ -3,12 +3,13 @@
 ## Setup
 
 Join Bot at [link](https://discord.com/api/oauth2/authorize?client_id=989447523204755476&permissions=8&scope=bot)
-> established on [Heroku](https://dashboard.heroku.com/)
+
+> established on [Heroku](https://dashboard.heroku.com/) with 550 free hours/month(22.9 Days, which shut down at every last week)
 
 ## !help
 
 ```
-A Native YT Player Bot(not support playlist currently)
+A YT Player Bot(not support playlist currently)
 
 Music:
   join    Joins a voice channel.
@@ -57,9 +58,23 @@ pip install -r requirements.txt
 python main.py
 ```
 
+### Run on Heroku
+
+> remember to hide your `DISCORD_TOKEN`
+
+1. add `DISCORD_TOKEN` at `Settings` > `Config Vars`
+2. add `https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git`, `https://github.com/xrisk/heroku-opus` at `Settings` > `Buildpacks`
+
 ## Clone from
 
 [gist.guac420/music_bot_example.py](https://gist.github.com/guac420/bc612fd3a35cd00ddc1c221c560daa01)
+
+## Other References
+
+- https://github.com/helionmusic/rhinobot_heroku
+- https://www.youtube.com/watch?v=OFearuMjI4s
+- https://stackoverflow.com/questions/65371837/my-on-member-join-event-is-not-working-i-tried-intents-but-it-gives-this-error
+- https://stackoverflow.com/questions/66379035/music-bot-not-playing-music-on-heroku-but-is-locally
 
 ## TODO
 

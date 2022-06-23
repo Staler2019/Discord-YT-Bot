@@ -610,7 +610,7 @@ class Music(commands.Cog):
                 raise commands.CommandError('Bot is already in a voice channel.')
 
 
-bot = commands.Bot(command_prefix='!', case_insensitive=True, description="A Native YT Player Bot(not support playlist currently)")
+bot = commands.Bot(command_prefix='!', case_insensitive=True, description="A YT Player Bot(not support playlist currently)")
 bot.add_cog(Music(bot))
 
 

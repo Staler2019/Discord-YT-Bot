@@ -4,7 +4,7 @@
 
 Join Bot at [link](https://discord.com/api/oauth2/authorize?client_id=989447523204755476&permissions=8&scope=bot)
 
-> established on [Heroku](https://dashboard.heroku.com/) with 550 free hours/month(22.9 Days, which shut down at every last week)
+> established on [Heroku](https://dashboard.heroku.com/) with free dynos(550 free hours/month and + 450 by adding credit card)
 
 ## !help
 

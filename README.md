@@ -9,7 +9,7 @@ Join Bot at [link](https://discord.com/api/oauth2/authorize?client_id=9894475232
 ## !help
 
 ```
-A YT Player Bot(not support playlist currently)
+A YT Player Bot(support playlist now)
 
 Music:
   join    Joins a voice channel.
@@ -78,4 +78,5 @@ python main.py
 
 ## TODO
 
-- [ ] add support for playlist
+- [x] add support for playlist
+- [ ] 'skip' cause 2 songs skipped because of youtube's frequent ip ban -> to make some wait via this action

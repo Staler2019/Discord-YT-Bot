@@ -44,7 +44,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
         'audioformat': 'mp3',
         'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
         'restrictfilenames': True,
-        'noplaylist': True,
+        'noplaylist': False, # use youtube playlist
         'nocheckcertificate': True,
         'ignoreerrors': False,
         'logtostderr': False,
@@ -87,45 +87,67 @@ class YTDLSource(discord.PCMVolumeTransformer):
         return '**{0.title}** by **{0.uploader}**'.format(self)
 
     @classmethod
-    async def create_source(cls, ctx: commands.Context, search: str, *, loop: asyncio.BaseEventLoop = None):
+    async def create_source(cls, ctx: commands.Context, search: str, *, loop: asyncio.BaseEventLoop = None): # TODO. simplify function
         loop = loop or asyncio.get_event_loop()
 
-        partial = functools.partial(cls.ytdl.extract_info, search, download=False, process=False)
+        # get urls
+        partial = functools.partial(cls.ytdl.extract_info, search, download=False, process=True) # playlist: process=True
         data = await loop.run_in_executor(None, partial)
 
-        if data is None:
+        if data is None: # video or playlist not found
             raise YTDLError('Couldn\'t find anything that matches `{}`'.format(search))
 
-        if 'entries' not in data:
-            process_info = data
-        else:
-            process_info = None
+        process_info_list = []
+        playlist_title = ""
+        playlist_uploader = ""
+        playlist_webpage_url = ""
+
+        if 'entries' not in data: # video
+            process_info_list.append(data)
+        else: # playlist
+            playlist_title = data['title']
+            playlist_uploader = data['uploader']
+            playlist_webpage_url = data['webpage_url']
+
             for entry in data['entries']:
                 if entry:
-                    process_info = entry
-                    break
+                    process_info_list.append(entry)
 
-            if process_info is None:
+            if len(process_info_list) == 0: # sure that playlist has content
                 raise YTDLError('Couldn\'t find anything that matches `{}`'.format(search))
 
-        webpage_url = process_info['webpage_url']
-        partial = functools.partial(cls.ytdl.extract_info, webpage_url, download=False)
-        processed_info = await loop.run_in_executor(None, partial)
+        # fetch sounds
+        source_dict = {"type": "video" if (len(process_info_list)==1) else "playlist", "playlist_title": playlist_title, 'uploader': playlist_uploader}
+        source_dict["each_audio"] = []
 
-        if processed_info is None:
-            raise YTDLError('Couldn\'t fetch `{}`'.format(webpage_url))
+        for process_info in process_info_list: # add each video to the return list
+            webpage_url = process_info['webpage_url'] # KeyError webpage_url here: open process=True above
+            partial = functools.partial(cls.ytdl.extract_info, webpage_url, download=False)
+            processed_info = await loop.run_in_executor(None, partial)
 
-        if 'entries' not in processed_info:
-            info = processed_info
-        else:
-            info = None
-            while info is None:
-                try:
-                    info = processed_info['entries'].pop(0)
-                except IndexError:
-                    raise YTDLError('Couldn\'t retrieve any matches for `{}`'.format(webpage_url))
+            if processed_info is None: # could not fetch a video
+                if source_dict['type'] == 'video': # type: video
+                    raise YTDLError('Couldn\'t fetch `{}`'.format(webpage_url))
+                else: # type: playlist
+                    print("YTDLSource.create_source: Couldn\'t fetch `{}` in the playlist".format(webpage_url))
+                    continue # to next song
 
-        return cls(ctx, discord.FFmpegPCMAudio(info['url'], **cls.FFMPEG_OPTIONS), data=info)
+            if 'entries' not in processed_info:
+                info = processed_info
+            else:
+                info = None
+                while info is None:
+                    try:
+                        info = processed_info['entries'].pop(0)
+                    except IndexError:
+                        raise YTDLError('Couldn\'t retrieve any matches for `{}`'.format(webpage_url))
+            if info is not None:
+                source_dict["each_audio"].append(cls(ctx, discord.FFmpegPCMAudio(info['url'], **cls.FFMPEG_OPTIONS), data=info))
+
+        if len(source_dict["each_audio"]) == 0: # could not fetch a playlist
+            raise YTDLError('Couldn\'t fetch `{}`'.format(playlist_webpage_url))
+
+        return source_dict
 
     @classmethod
     async def search_source(cls, ctx: commands.Context, search: str, *, loop: asyncio.BaseEventLoop = None):
@@ -559,17 +581,23 @@ class Music(commands.Cog):
         """
 
         async with ctx.typing():
-            try:
+            try: # try...except...else...finally
                 source = await YTDLSource.create_source(ctx, search, loop=self.bot.loop)
             except YTDLError as e:
                 await ctx.send('An error occurred while processing this request: {}'.format(str(e)))
             else:
-                if not ctx.voice_state.voice:
-                    await ctx.invoke(self._join)
+                if not ctx.voice_state.voice: # if not playing music now
+                    await ctx.invoke(self._join) # play the new added music
 
-                song = Song(source)
-                await ctx.voice_state.songs.put(song)
-                await ctx.send('Enqueued {}'.format(str(source)))
+                if source['type'] == 'video':
+                    song = Song(source["each_audio"][0])
+                    await ctx.voice_state.songs.put(song) # push_back song
+                    await ctx.send('Enqueued {}'.format(str(source["each_audio"][0])))
+                elif source['type'] == 'playlist':
+                    for src in source['each_audio']:
+                        song = Song(src)
+                        await ctx.voice_state.songs.put(song) # push_back song
+                    await ctx.send('Enqueued **{}** by **{}**'.format(str(source['playlist_title']), str(source['uploader']))) #TODO.
 
     @commands.command(name='search')
     async def _search(self, ctx: commands.Context, *, search: str):
@@ -609,21 +637,21 @@ class Music(commands.Cog):
             if ctx.voice_client.channel != ctx.author.voice.channel:
                 raise commands.CommandError('Bot is already in a voice channel.')
 
+if __name__ == '__main__':
+    bot = commands.Bot(command_prefix='!', case_insensitive=True, description="A YT Player Bot(support playlist now)")
+    bot.add_cog(Music(bot))
 
-bot = commands.Bot(command_prefix='!', case_insensitive=True, description="A YT Player Bot(not support playlist currently)")
-bot.add_cog(Music(bot))
 
+    @bot.event
+    async def on_ready():
+        print('Logged in as:\n{0.user.name}\n{0.user.id}'.format(bot))
 
-@bot.event
-async def on_ready():
-    print('Logged in as:\n{0.user.name}\n{0.user.id}'.format(bot))
+    @bot.command(name='botstop', aliases=['bstop'])
+    @commands.is_owner()
+    async def botstop(ctx):
+        print('Goodbye')
+        await ctx.send('Goodbye')
+        await bot.close()
+        return
 
-@bot.command(name='botstop', aliases=['bstop'])
-@commands.is_owner()
-async def botstop(ctx):
-    print('Goodbye')
-    await ctx.send('Goodbye')
-    await bot.close()
-    return
-
-bot.run(token)
+    bot.run(token)
